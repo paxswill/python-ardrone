@@ -28,93 +28,96 @@ stream.
 """
 
 
-import pygame
+import pyglet
+from pyglet.window import key
 
 import libardrone
 
-
 def main():
-    pygame.init()
     W, H = 320, 240
-    screen = pygame.display.set_mode((W, H))
+    window = pyglet.window.Window(width=W, height=H)
     drone = libardrone.ARDrone()
-    clock = pygame.time.Clock()
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False 
-            elif event.type == pygame.KEYUP:
-                drone.hover()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    drone.reset()
-                    running = False
-                # takeoff / land
-                elif event.key == pygame.K_RETURN:
-                    drone.takeoff()
-                elif event.key == pygame.K_SPACE:
-                    drone.land()
-                # emergency
-                elif event.key == pygame.K_BACKSPACE:
-                    drone.reset()
-                # forward / backward
-                elif event.key == pygame.K_w:
-                    drone.move_forward()
-                elif event.key == pygame.K_s:
-                    drone.move_backward()
-                # left / right
-                elif event.key == pygame.K_a:
-                    drone.move_left()
-                elif event.key == pygame.K_d:
-                    drone.move_right()
-                # up / down
-                elif event.key == pygame.K_UP:
-                    drone.move_up()
-                elif event.key == pygame.K_DOWN:
-                    drone.move_down()
-                # turn left / turn right
-                elif event.key == pygame.K_LEFT:
-                    drone.turn_left()
-                elif event.key == pygame.K_RIGHT:
-                    drone.turn_right()
-                # speed
-                elif event.key == pygame.K_1:
-                    drone.speed = 0.1
-                elif event.key == pygame.K_2:
-                    drone.speed = 0.2
-                elif event.key == pygame.K_3:
-                    drone.speed = 0.3
-                elif event.key == pygame.K_4:
-                    drone.speed = 0.4
-                elif event.key == pygame.K_5:
-                    drone.speed = 0.5
-                elif event.key == pygame.K_6:
-                    drone.speed = 0.6
-                elif event.key == pygame.K_7:
-                    drone.speed = 0.7
-                elif event.key == pygame.K_8:
-                    drone.speed = 0.8
-                elif event.key == pygame.K_9:
-                    drone.speed = 0.9
-                elif event.key == pygame.K_0:
-                    drone.speed = 1.0
+    label = pyglet.text.Label(font_name=["Helvetica", "Arial"], font_size=20,
+                              x=10, y=10, text="0", color=(0, 0, 0, 255, 220))
+    fps_display = pyglet.clock.ClockDisplay()
 
+
+    def move(symbol, modifiers):
+        if symbol == key.UP:
+            drone.move_up()
+        elif symbol == key.DOWN:
+            drone.move_down()
+        elif symbol == key.LEFT:
+            drone.turn_left()
+        elif symbol == key.RIGHT:
+            drone.turn_right()
+        elif symbol == key.W:
+            drone.move_forward()
+        elif symbol == key.S:
+            drone.move_backward()
+        elif symbol == key.A:
+            drone.move_left()
+        elif symbol == key.D:
+            drone.move_right()
+        elif symbol == key.RETURN:
+            drone.takeoff()
+        elif symbol == key.SPACE:
+            drone.land()
+        elif symbol == key.BACKSPACE:
+            drone.reset()
+        else:
+            return pyglet.event.EVENT_UNHANDLED
+        return pyglet.event.EVENT_HANDLED
+    window.push_handlers(on_key_press=move)
+
+    def change_speed(symbol, modifiers):
+        speeds = {
+                key._1 : 0.1,
+                key._2 : 0.2,
+                key._3 : 0.3,
+                key._4 : 0.4,
+                key._5 : 0.5,
+                key._6 : 0.6,
+                key._7 : 0.7,
+                key._8 : 0.8,
+                key._9 : 0.9,
+                key:_0 : 1.0
+                }
         try:
-            surface = pygame.image.fromstring(drone.image, (W, H), 'RGB')
-            # battery status
-            hud_color = (255, 0, 0) if drone.navdata.get('drone_state', dict()).get('emergency_mask', 1) else (10, 10, 255)
-            bat = drone.navdata.get(0, dict()).get('battery', 0)
-            f = pygame.font.Font(None, 20)
-            hud = f.render('Battery: %i%%' % bat, True, hud_color)
-            screen.blit(surface, (0, 0))
-            screen.blit(hud, (10, 10))
-        except:
-            pass
+            drone.speed = speeds[symbol]
+        except KeyError:
+            return pyglet.event.EVENT_UNHANDLED
+        return pyglet.event.EVENT_HANDLED
+    window.push_handlers(on_key_press=change_speed)
 
-        pygame.display.flip()
-        clock.tick(50)
-        pygame.display.set_caption("FPS: %.2f" % clock.get_fps())
+    def hover(symbol, modifiers):
+        drone.hover()
+    window.push_handlers(on_key_release=hover)
+
+    @window.event
+    def on_draw():
+        # Draw the image
+        window.clear()
+        image_data = drone.image
+        image = pyglet.image.ImageData(width=image_data['width'],
+                                       height=image_data['height'],
+                                       format='RGB',
+                                       data=image['data'])
+        image.blit(0.0, 0.0)
+        # Draw a simple HUD
+        in_emergency = drone.navdata.get('drone_state', dict()).get('emergency_mask', 1)
+        hud_color = (255, 0, 0, 220) if in_emergency else (10, 10, 255, 204)
+        battery_level = drone.navdata.get(0, dict()).get('battery', 0)
+        label.color = hud_color
+        label.text = "Battery {}%".format(battery_level)
+        label.draw()
+        # Draw FPS
+        fps_display.draw()
+
+    @window.event
+    def close():
+        drone.reset()
+        drone.halt()
 
     print "Shutting down...",
     drone.halt()
