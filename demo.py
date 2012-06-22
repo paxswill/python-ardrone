@@ -93,6 +93,8 @@ def main():
     def hover(symbol, modifiers):
         drone.hover()
     window.push_handlers(on_key_release=hover)
+    # Safety feature
+    window.push_handlers(on_deactivate=hover)
 
     @window.event
     def on_draw():
